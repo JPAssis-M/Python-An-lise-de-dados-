@@ -14,7 +14,6 @@ rotas = config.ROTAS
 tabelaA = config.TABELA_A
 tabelaB = config.TABELA_B
 
-
 #Arquivos a serem carregados
 dfDrinks = pd.read_csv(f'{caminhoBanco}{tabelaA}') 
 dfAvengers = pd.read_csv(f'{caminhoBanco}{tabelaB}', encoding='latin1')
@@ -84,10 +83,130 @@ def grafico2():
     )
     return figuraGrafico02.to_html()
 
+@app.route(rotas[3])
+def grafico3():
+    regioes = {
+        "Europa": ['France', 'Germany','Spain','Italy','Portugal'],
+        "Asia": ['China', 'Japan','India','Thailand'],
+        "Africa": ['Angola', 'Nigeria', 'Egypt','Algeria'],
+        "America":['USA','Brazil','Canada','Argentina','Mexico']   
+    }
+    dados = []
+    with sqlite3.connect(f'{caminhoBanco}{nomeBanco}') as conn:
+        for regiao, paises in regioes.items():
+            placeholders = ",".join([f"'{p}'" for p in paises])
+            query = f''' 
+                SELECT SUM (total_litres_of_pure_alcohol) AS total
+                FROM  bebidas
+                WHERE country IN ({placeholders})
+    '''
+            total = pd.read_sql_query(query, conn).iloc[0,0]
+            dados.append({"região": regiao,
+                        "Consumo total": total})
+
+    dfRegioes = pd.DataFrame(dados)
+    figuraGrafico03 = px.pie(
+        dfRegioes , 
+        names = "região" ,
+        values = "Consumo total" ,
+        title = "Consumo total por região"
+    )
+    return figuraGrafico03.to_html() + f"<br><a href'{rotas[0]}'>Voltar</a>"
+
+@app.route(rotas[4])
+def grafico4():
+    with sqlite3.connect(f'{caminhoBanco}{nomeBanco}') as conn:
+        df = pd.read_sql_query(Consultas.consulta03, conn)
+        medias = df.mean().reset_index()
+        medias.columns = ['Tipo', 'Média']
+        figuraGrafico04 = px.pie(
+            medias,
+            names = "Tipo",
+            values = "Média",
+            title = "Proporção média entre os tipos de bebidas!"
+        )
+        return figuraGrafico04.to_html() + f"<br><a href'{rotas[0]}'>Voltar</a>"
+
+
+@app.route(rotas[5], methods = ["POST", "GET"])
+def comparar():   
+    opcoes = [
+        'beer_servings',
+        'spirit_servings',
+        'wine_servings'
+    ]
+
+    if request.method == "POST":
+        eixo_x = request.form.get('eixo_x')
+        eixo_Y = request.form.get('eixo_y')
+        if eixo_x == eixo_Y:
+            return f"<h3> Selecionar campos diferentes! <h3> <br><a href='{rotas[0]}'>Voltar</a>"
+        conn = sqlite3.connect(f'{caminhoBanco}{nomeBanco}')
+        df = pd.read_sql_query("SELECT country, {}, {} FROM bebidas".format(eixo_x,eixo_Y), conn)
+        conn.close()
+
+        figuraComparar = px.scatter(
+                df,
+                x = eixo_x,
+                y = eixo_Y,
+                title=f"Comparação entre {eixo_x} VS {eixo_Y} "
+        )
+        figuraComparar.update_traces(textposition = 'top center')
+        return figuraComparar.to_html() + f"<br><a href'{rotas[0]}'>Voltar</a>"
+
+    return render_template_string('''
+        <h2> comparar campos </h2>
+        <form method = "POST">
+            <label> Eixo X </label>
+            <select name = "eixo_x">
+                    {% for opcao in opcoes %}
+                        <option value ='{{opcao}}'> {{opcao}} </option>
+                    {% endfor %}
+            </select>               
+            <br> <br>
+
+            <label> Eixo Y </label>
+            <select name = "eixo_y">
+                    {% for opcao in opcoes %}
+                        <option value ='{{opcao}}'> {{opcao}} </option>
+                    {% endfor %}
+            </select>               
+            <br> <br>
+
+            <input type="submit" value= "--comparar--">                                           
+        </form>
+        <br><a href="{{rotaInterna}}">Voltar</a>                                                           
+    ''', opcoes = opcoes, rotaInterna = rotas[0])
+
+@app.route(rotas[6],methods=['GET','POST'])
+def upload():
+    if request.method=="POST":
+        recebido = request.files['c_arquivo']
+        if not recebido:
+            return f"<h3> Nenhum arquivo enviado </h3><br><a href='{rotas[6]}'>Voltar</a>"
+        dfAvengers.to_sql("vingadores",conn, if_exists="replace",
+        index=False)   
+        conn.commit()
+        conn.close()
+        return f"<h3> Upload feito com sucesso  </h3><br><a href='{rotas[6]}'>Voltar</a>"
+
+    return'''
+        <h2> Upload da tabela Avengers! </h2>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="c_arquivo" accept=".csv">
+            <input type="submit" value="--Carregar--">
+        </form>
+'''
+
+
+
+
+
+
 #inicia o servidor
 if __name__ == '__main__':
     app.run(
         debug = config.FLASK_DEBUG,
         host = config.FLASK_HOST,
-        PORT = config.FLASK_PORT
+        port = config.FLASK_PORT
     )
