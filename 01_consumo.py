@@ -52,6 +52,12 @@ html_template = f'''
 #iniciar o flask
 app = Flask(__name__)
 
+def getDbConnect():
+    conn = sqlite3.connect(f'{caminhoBanco}{nomeBanco}')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
 @app.route(rotas[0])
 def index():
     return render_template_string(html_template)
@@ -197,9 +203,57 @@ def upload():
             <input type="submit" value="--Carregar--">
         </form>
 '''
+@app.route('/apagar_tabela/<nome_tabela>', methods=['GET'])
+def apagarTabela(nome_tabela): 
+    conn = getDbConnect()
+    cursor = conn.cursor()
 
+#usaremoso try except para controlar possíveis erros
+#confirmar se a tabela existe
+    cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name={nome_tabela}")
+    existe = cursor.fetchone()[0]
+    if not existe: 
+        conn.close()
+        return "Tabela não encontrada"
+    try: 
+        cursor.execute(f'DROP TABLE "{nome_tabela}"')
+        conn.commit()
+        conn.close()
+        return f'Tabela{nome_tabela}apagada com sucesso'
+    except Exception as erro:
+        conn.close()
+        return f"Não foi possível apagar a tabela erro: {erro}"
 
+@app.route(rotas[8], methods=["POST","GET"])
+def ver_tabela():     
+    if request.method =="POST":
+        nome_tabela = request.form.get('tabela')
+        if nome_tabela not in ['bebidas', 'vingadores']:
+            return f"<h3> Tabela {nome_tabela} não encontrada</h3> <br><a href{rotas[8]}>Voltar</a>"
+        
+        conn =getDbConnect()
+        df = pd.read_sql_query(f"SELECT * from {nome_tabela}", conn)
+        conn.close()
+        tabela_html = df.to_html(classes='table table-striped')
+        return f'''
+            <h3>Conteudo da tabela {nome_tabela}:</h3>                
+            {tabela_html}
+            <br><a href={rotas[8]}>Voltar</a>
 
+'''
+    return render_template_string ('''
+        <marquee>Selecione a tabela a ser visualizada: </marquee>
+        <form method="POST">
+            <label for="tabela">Escolha a tabela abaixo: </label>      
+            <select name="tabela">
+                <option value="bebidas">Bebidas</option>
+                <option value="vingadores">Vingadores</option>
+            </select>
+        </form>
+        <hr>
+        <input type="submit" value="Consultar Tabela">
+        <br><a href={{rotas[0]}}>Voltar </a>
+    ''', rotas=rotas)
 
 
 
