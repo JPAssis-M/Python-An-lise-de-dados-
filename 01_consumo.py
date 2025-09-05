@@ -249,13 +249,96 @@ def ver_tabela():
                 <option value="bebidas">Bebidas</option>
                 <option value="vingadores">Vingadores</option>
             </select>
-        </form>
-        <hr>
-        <input type="submit" value="Consultar Tabela">
+            <hr>
+            <input type="submit" value="Consultar Tabela">
+         </form>
         <br><a href={{rotas[0]}}>Voltar </a>
     ''', rotas=rotas)
 
+'''
+@app.route(rotas[7], methods=['GET'])
+def apagarV2(nome_tabela):
+    conn = getDbConnect()
+    cursor = conn.cursor()
 
+    cursor.execute(f"SELECT * FROM sqlite_master WHERE type='table' AND name='{nome_tabela}'")
+    existe = cursor.fetchone()[0]
+    if not existe:
+        conn.close()
+        return "Tabela não encontrada"
+    
+    try: 
+        cursor.execute(f'DROP TABLE "{nome_tabela}"')
+        conn.commit()
+        conn.close()
+        return f'Tabela {nome_tabela} apagada com sucesso'
+    except Exception as erro:
+        conn.close()
+        return f"Não foi possível apagar a tabela. Erro: {erro}"       
+'''
+@app.route(rotas[7],methods=['Post','GET'])
+def apagarV2():
+    if request.method =="POST":
+        nome_tabela = request.form.get('tabela')
+        if nome_tabela not in ['bebidas','vingadores']:
+         return f"<h3> Tabela {nome_tabela} não encontrada</h3> <br><a href{rotas[7]}>Voltar</a>"
+        
+        confirmacao = request.form.get('confirmacao')
+        conn = getDbConnect()
+        if confirmacao == "sim":
+            try: 
+                cursor = conn.cursor()
+                cursor.execute('SELECIONAR name_FROM sqlite_master WHERE type= tabela AND name=?', (nome_tabela,))
+                if cursor.fetchone() is None:
+                    return f"<h3>Tabela {nome_tabela} não encontrada no banco de dados! </h3><br><a href={rotas[7]}>Voltar</a>"
+                cursor.execute(f'DROP TABLE IF EXISTS "{nome_tabela}"')
+                conn.commit()
+                conn.close()
+                return f"<h3>Tabela {nome_tabela} não encontrada no banco de dados! </h3><br><a href={rotas[7]}>Voltar</a>"
+
+            except Exception as erro:
+                conn.close()
+                return f"<h3>Erro ao apagar a tabela {nome_tabela} Erro:{erro} </h3><br><a href={rotas[7]}>Voltar</a>"
+    
+    return f'''
+        <html>
+            <head>
+                <title><marquee> CUIDADO!-Apagar Tabela </marquee></title>
+            </head>
+            <>body        
+            <h2> Selecionar a tabela para apagar </h1>
+            <form method="POST" id="formApagar">
+                <label for="tabela"> Escolha na tabela abaixo: </label>
+                <select name="tabela" id="tabela">
+                    <option value="">Selecione...</option>
+                    <option value="bebidas">Bebidas</option>
+                    <option value="vingadores">Vingadores </option>
+                    <option value="vingadores">Usuarios</option>
+                </select>
+                <input type="hidden" name="confirmacao" value="" 
+                id="confirmacao">
+                <input type="submit" value = "--Apagar!--" onclick="return confirmarExclusao();"
+            </form>    
+            <br><a href={{rotas[0]}}>Voltar</a>            
+            <script type="text/javascript">
+                function confirmarExclusao(){{
+                var ok = confirm ('tem certeza de que deseja apagar a tabela selecionada'); 
+                if(ok) {{
+                    document.getElementById
+                    ('confirmacao').value = 'sim';
+                    return true
+                }}
+                else{{        
+                   document.getElementById
+                    ('confirmacao').value = 'não';
+                    return false
+                }}
+            </script>   
+            <body>            
+        </html>
+ '''     
+
+            
 
 #inicia o servidor
 if __name__ == '__main__':
