@@ -6,13 +6,13 @@ import random
 import sqlite3
 import datetime
 
-# headers para simular que somos um navegador real
-#camuflagem no modo sniper| ☻
+# headers para simular que somos um navegador real!
+# camuflagem no modo sniper! ☻
 headers = {
-    'User-Agent':'Mozill/5.0 (Windows NT 10.0; Win64; x64)AppleWebKit/537.36(KHTML, like Gecko) Chrome/114.0 Safari/537.36'
+    'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64)AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0 Safari/537.36' 
 }
 baseURL = "https://www.adorocinema.com/filmes/melhores/"
-filmes = [] #Lista que vai armazenar os dados coletor de cada filme
+filmes = [] # lista que vai armazenar os dados coletador de cada filme
 data_hoje = datetime.date.today().strftime("%d-%m-%Y")
 inicio = datetime.datetime.now()
 
@@ -20,9 +20,9 @@ card_temp_min = 1
 card_temp_max = 3
 pag_temp_min = 2
 pag_temp_max = 4
-paginaLimite = 2 #limite de páginas
+paginaLimite = 40 # limite de paginas
 bancoDados = "filmes.db"
-saidaCSV = f"filme_adorocinema_{data_hoje}.csv"
+saidaCSV = f"filmes_adorocinema_{data_hoje}.csv"
 
 for pagina in range(1, paginaLimite +1):
     url = f"{baseURL}?page={pagina}"
@@ -30,11 +30,12 @@ for pagina in range(1, paginaLimite +1):
     resposta = requests.get(url, headers=headers)
 
     if resposta.status_code != 200:
-        print(f"Erro ao carregar a pagina {pagina}.Codigo do erro é: {resposta.status_code}")
-    soup = BeautifulSoup(resposta.text, "html.parser")
-    cards = soup.find_all("div",class_="card entity-card entity-card-list cf")
+        print(f"Erro ao carregar a pagina {pagina}. Codigo do erro é: {resposta.status_code}")
 
-for card in cards:
+    soup = BeautifulSoup(resposta.text, "html.parser")
+    cards = soup.find_all("div", class_="card entity-card entity-card-list cf")
+
+    for card in cards:
         try:
             # captura o titulo do filme e o hiperlink da pagina do filme
             titulo_tag = card.find("a", class_="meta-title-link")
@@ -103,66 +104,62 @@ for card in cards:
         except Exception as erro:
             print(f"Erro ao processa o filme {titulo}. Erro: {erro}")
     # antes de passar para a proxima pagina, vamos esperar um tempo
-tempo = random.uniform(pag_temp_min,pag_temp_max) 
-print(f"Tempo de Espera entre paginas: {tempo:.1f}s")
-time.sleep(tempo)
+    tempo = random.uniform(pag_temp_min,pag_temp_max) 
+    print(f"Tempo de Espera entre paginas: {tempo:.1f}s")
+    time.sleep(tempo)
 
-# converter os dados em um dataframe dos pandas
+# converter os dados em um dataframe do pandas
 df = pd.DataFrame(filmes)
 print(df.head())
 
-#vamos salvar os dados em um arquivo csv
-termino = datetime.datetime.now()
-#__________________________________________
-#SQLITE: CRIAÇÃO E INSERT NO BANCO
-#__________________________________________
-with sqlite3.adapt(bancoDados) as conn: 
-    cursor = conn.cursos()
+# vamos salvar os dados em um arquivo csv
+df.to_csv(saidaCSV, index=False, encoding='utf-8-sig', quotechar="'", quoting=1)
 
-    #tabela simples: link unico para evitar  a repeticao ao roda de novo
+##########################################
+#   SQLite: Criação e insert no banco
+##########################################
+
+with sqlite3.connect(bancoDados) as conn:
+    cursor = conn.cursor()
+
+    #tabela simples: link unico para evitar a repetição ao roda de novo (idempotente)
     cursor.execute('''
-            CREATE TABLE IF NOT EXISTS filmes(
-                    id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                    Titulo TEXT,
-                    Direcao TEXT,
-                    Nota REAL,
-                    Link TEXT UNIQUE,
-                    Ano TEXT,
-                    Categoria TEXT
-                    ''')    
-
-# INSERIR CADA FILME COLETADO
+        CREATE TABLE IF NOT EXISTS filmes(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            Titulo TEXT,
+            Direcao TEXT,
+            Nota REAL,
+            Link TEXT UNIQUE,
+            Ano TEXT,
+            Categoria TEXT           
+        )         
+    ''')
+    # inserir cada filme coletado
     for filme in filmes:
         try:
             cursor.execute('''
-                INSERT OR IGNORE INTO filmes (Titulo, Direcao, Nota, Link, Ano, Categoria) VALUES (?,?,?,?,?,?)
-             ''',(
-                 filme['Titulo'],
-                 filme['Direcao'],
-                 float(filme[nota]) if filme [nota] !='N/A' else None,
-                 filme['Link'],
-                 filme['Ano'],
-                 filme['Categoria']
-             ))
+                INSERT OR IGNORE INTO filmes (Titulo, Direcao, Nota, Link, Ano, Categoria) VALUES (?, ?, ?, ?, ?, ?)
+            ''',(
+                filme['Titulo'],
+                filme['Direção'],
+                float(filme['Nota']) if filme['Nota'] != 'N/A' else None,
+                filme['Link'],
+                filme['Ano'],
+                filme['Categoria']
+            ))
         except Exception as erro:
-            print (f'Erro ao inserir filme {filme[titulo]} no banco de dados. \nDetalhes: {erro}')
+            print(f"Erro ao inserir filme {filme['Titulo']} no banco de dados. \nDetalhes: {erro}")
     conn.commit()
-    conn.close()
 
-
-
+termino = datetime.datetime.now()
 print("-----------------------------------------------")
 print("Dados raspados e salvos com sucesso")
 print(f"\nArquivo CSV salvo em: {saidaCSV}")
+print(f"\nDados armazenados no banco de dados {bancoDados}")
 print("\nObrigado por usar o Sistema de Bot CineBot")
 print(f"\nIniciado em: {inicio.strftime('%H:%M:%S')}")
 print(f"\nFinalizado em: {termino.strftime('%H:%M:%S')}")
 print("-----------------------------------------------")
 
-df.to_csv(saidaCSV, index=False, encoding='utf-8-sig')
-original_db = {filmes.db}
-backup_db = "filmes_backup.db"
-print(f"Backup do banco de dados criado com sucesso: {backup_db}")
-conn = sqlite3.connect("filmes.db")
 
 
